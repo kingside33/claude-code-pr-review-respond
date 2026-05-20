@@ -30,7 +30,7 @@ A [Claude Code](https://claude.ai/code) skill that automates responding to code 
 ### Option 1: Git Clone (Recommended)
 
 ```bash
-git clone https://github.com/WangZixu/claude-code-pr-review-respond \
+git clone https://github.com/kingside33/claude-code-pr-review-respond \
   ~/.claude/skills/pr-review-respond
 ```
 
@@ -43,7 +43,7 @@ Then reference it in `~/.claude/CLAUDE.md`:
 ### Option 2: npx skills add
 
 ```bash
-npx skills add https://github.com/WangZixu/claude-code-pr-review-respond
+npx skills add https://github.com/kingside33/claude-code-pr-review-respond
 ```
 
 ### Option 3: Manual Download

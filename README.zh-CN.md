@@ -30,7 +30,7 @@
 ### 方式一：Git 克隆（推荐）
 
 ```bash
-git clone https://github.com/WangZixu/claude-code-pr-review-respond \
+git clone https://github.com/kingside33/claude-code-pr-review-respond \
   ~/.claude/skills/pr-review-respond
 ```
 
@@ -43,7 +43,7 @@ git clone https://github.com/WangZixu/claude-code-pr-review-respond \
 ### 方式二：npx skills add
 
 ```bash
-npx skills add https://github.com/WangZixu/claude-code-pr-review-respond
+npx skills add https://github.com/kingside33/claude-code-pr-review-respond
 ```
 
 ### 方式三：手动下载
