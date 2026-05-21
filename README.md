@@ -1,12 +1,12 @@
 # claude-code-pr-review-respond
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](SKILL.md)
+[![Version](https://img.shields.io/badge/version-1.0.1-green.svg)](SKILL.md)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-orange.svg)](https://claude.ai/code)
 
 > [中文版本](README.zh-CN.md)
 
-A [Claude Code](https://claude.ai/code) skill that automates responding to code review comments on GitHub pull requests. It fetches review comments, categorizes them, implements fixes, runs tests, commits, pushes, replies in Chinese, and resolves all conversation threads.
+A [Claude Code](https://claude.ai/code) skill that automates responding to code review comments on GitHub pull requests. It fetches review comments, categorizes them, implements fixes, runs tests, commits, pushes, replies in Chinese, and resolves all conversation threads. Supports multi-round review loops to handle AI review bot feedback on pushed changes.
 
 ## What it does
 
@@ -15,6 +15,8 @@ A [Claude Code](https://claude.ai/code) skill that automates responding to code 
 3. **Implements** code fixes for "needs fix" items, runs tests, commits, pushes
 4. **Replies** to each review thread in Chinese (中文) on GitHub
 5. **Resolves** each conversation thread after replying
+6. **Loops** automatically — after pushing fixes, waits for AI review bot feedback and processes new comments (up to 3 rounds)
+7. **Creates bidirectional trace** between commits and comments: commit messages reference comment IDs, replies reference commit SHAs
 
 ## Why a skill, not just a prompt
 
@@ -24,6 +26,7 @@ A [Claude Code](https://claude.ai/code) skill that automates responding to code 
 - Commit message conventions with Co-Authored-By attribution
 - Test-before-commit enforcement
 - Auto-detection of test runners across tech stacks
+- Multi-round review loop for AI review bot integration
 
 ## Installation
 
@@ -73,25 +76,29 @@ If no arguments are given, the skill auto-detects from `git remote get-url origi
 
 ### Step 1 — Fetch review comments
 
-Uses `gh api` to retrieve all PR review comments (REST) and thread resolution status (GraphQL).
+Uses `gh api` to retrieve all PR review comments (REST) and thread resolution status (GraphQL). In round 2+, filters out threads already processed in prior rounds.
 
 ### Step 2 — Categorize
 
 | Category | Criteria | Action |
 |----------|----------|--------|
-| Already fixed | Fix exists in a prior commit | Reply with commit ref, resolve |
+| Already fixed | Fix exists in a prior commit (pre-existing or from a prior round) | Reply with commit ref + round number (if applicable), resolve |
 | Needs fix | Valid issue requiring code change | Fix → test → commit → push → reply → resolve |
 | Wontfix | Invalid, out of scope, or design choice | Reply with rationale, resolve |
 
 ### Step 3 — Implement fixes
 
-Makes minimal code changes, auto-detects and runs the test suite, commits with conventional commit format including `Co-Authored-By` trailer, then pushes.
+Makes minimal code changes, auto-detects and runs the test suite, commits with conventional commit format including `Addresses review comments: #id` line and `Co-Authored-By` trailer, then pushes.
 
 ### Step 4 — Reply and resolve
 
-Posts a reply in Chinese under each review thread using GraphQL, then immediately resolves that thread. Processes one thread at a time.
+Posts a reply in Chinese under each review thread using GraphQL, then immediately resolves that thread. Replies include commit SHA, file path, and comment ID for full traceability.
 
-### Step 5 — Update docs
+### Loop decision
+
+After resolving all threads, the skill waits (default 45s) for an AI review bot to post new comments on the pushed code. If new unresolved threads appear, it loops back to Step 1 for another round (up to 3 rounds total).
+
+### Step 6 — Update docs
 
 Optionally updates project documentation (`docs/change-log.md`, `docs/progress.md`, etc.) if the project maintains them according to CLAUDE.md conventions.
 
@@ -99,9 +106,17 @@ Optionally updates project documentation (`docs/change-log.md`, `docs/progress.m
 
 All replies are in Chinese:
 
-- **Already fixed**: "已修复：\<description\>。Commit: \<short SHA\>"
+- **Already fixed (first round)**: "已修复：\<description\>。Commit: \<short SHA\>（文件：\<path\>，对应评论 \#id）"
+- **Already fixed (subsequent rounds)**: "已在第N轮修复：\<description\>。Commit: \<short SHA from prior round\>（文件：\<path\>，对应评论 \#id）"
 - **Wontfix**: "不采纳：\<reason\>"
-- **Needs fix (after fixing)**: "已修复：\<description\>。Commit: \<short SHA\>"
+- **Needs fix (after fixing)**: "已修复：\<description\>。Commit: \<short SHA\>（文件：\<path\>，对应评论 \#id）"
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PR_REVIEW_POLL_INTERVAL` | `45` | Seconds to wait for AI review bot between rounds |
+| `PR_REVIEW_MAX_ROUNDS` | `3` | Maximum number of review rounds |
 
 ## Repository structure
 

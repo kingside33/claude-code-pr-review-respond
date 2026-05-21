@@ -1,12 +1,12 @@
 # claude-code-pr-review-respond
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](SKILL.md)
+[![Version](https://img.shields.io/badge/version-1.0.1-green.svg)](SKILL.md)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-orange.svg)](https://claude.ai/code)
 
 > [English Version](README.md)
 
-一个 [Claude Code](https://claude.ai/code) 技能，用于自动化处理 GitHub Pull Request 上的代码审查评论。它会获取审查评论、分类、实施修复、运行测试、提交、推送、用中文回复并解决所有讨论串。
+一个 [Claude Code](https://claude.ai/code) 技能，用于自动化处理 GitHub Pull Request 上的代码审查评论。它会获取审查评论、分类、实施修复、运行测试、提交、推送、用中文回复并解决所有讨论串。支持多轮审查循环，自动处理 AI 审查机器人对新推送代码的反馈。
 
 ## 功能
 
@@ -15,6 +15,8 @@
 3. **实施** 代码修复，运行测试，提交，推送
 4. **回复** 每条审查评论（使用中文）
 5. **解决** 回复后立即解决每个讨论串
+6. **自动循环** — 推送修复后，等待 AI 审查机器人反馈并处理新评论（最多 3 轮）
+7. **建立双向追溯** — commit 消息引用评论 ID，回复引用 commit SHA
 
 ## 为什么是技能而不是普通提示词
 
@@ -24,6 +26,7 @@
 - 规范的提交信息格式，包含 Co-Authored-By 署名
 - 强制执行"先测试再提交"原则
 - 自动检测不同技术栈的测试运行器
+- 多轮审查循环，完美适配 AI 审查机器人
 
 ## 安装
 
@@ -73,25 +76,29 @@ npx skills add https://github.com/kingside33/claude-code-pr-review-respond
 
 ### 第一步 — 获取审查评论
 
-使用 `gh api` 获取所有 PR 审查评论（REST 接口）和讨论串解决状态（GraphQL 接口）。
+使用 `gh api` 获取所有 PR 审查评论（REST 接口）和讨论串解决状态（GraphQL 接口）。第 2+ 轮会过滤掉之前轮次已处理的评论串。
 
 ### 第二步 — 分类
 
 | 分类 | 判断标准 | 操作 |
 |------|---------|------|
-| 已修复 | 修复已存在于之前的提交中 | 回复说明哪个提交，然后解决 |
+| 已修复 | 修复已存在于之前的提交中（先前轮次或本次会话） | 回复说明提交 SHA 和轮次，然后解决 |
 | 需要修复 | 有效问题，需要代码更改 | 修复 → 测试 → 提交 → 推送 → 回复 → 解决 |
 | 不采纳 | 无效、超出范围或设计决策 | 回复说明理由，然后解决 |
 
 ### 第三步 — 实施修复
 
-进行最小化代码更改，自动检测并运行测试套件，按照 conventional commit 格式提交（含 `Co-Authored-By` 署名），然后推送。
+进行最小化代码更改，自动检测并运行测试套件，按照 conventional commit 格式提交（包含 `Addresses review comments: #id` 行和 `Co-Authored-By` 署名），然后推送。
 
 ### 第四步 — 回复并解决
 
-使用 GraphQL 在每个审查评论串下用中文回复，然后立即解决该讨论串。逐条处理，不批量操作。
+使用 GraphQL 在每个审查评论串下用中文回复，然后立即解决该讨论串。回复中包含 commit SHA、文件路径和评论 ID，实现完整追溯。
 
-### 第五步 — 更新文档
+### 循环决策
+
+解决所有评论串后，技能会等待（默认 45 秒）AI 审查机器人在新推送代码上发布新评论。如果发现新的未解决评论串，则返回第一步开始新一轮处理（最多 3 轮）。
+
+### 第六步 — 更新文档
 
 如项目维护了 `docs/change-log.md`、`docs/progress.md` 等文档，根据 CLAUDE.md 约定选择性更新。
 
@@ -99,9 +106,17 @@ npx skills add https://github.com/kingside33/claude-code-pr-review-respond
 
 所有回复使用中文：
 
-- **已修复**：已修复：\<描述\>。Commit: \<短SHA\>
+- **已修复（第一轮）**：已修复：\<描述\>。Commit: \<短SHA\>（文件：\<路径\>，对应评论 \#id）
+- **已修复（后续轮次）**：已在第N轮修复：\<描述\>。Commit: \<前轮次短SHA\>（文件：\<路径\>，对应评论 \#id）
 - **不采纳**：不采纳：\<理由\>
-- **需要修复（修复后）**：已修复：\<描述\>。Commit: \<短SHA\>
+- **需要修复（修复后）**：已修复：\<描述\>。Commit: \<短SHA\>（文件：\<路径\>，对应评论 \#id）
+
+## 环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `PR_REVIEW_POLL_INTERVAL` | `45` | 等待 AI 审查机器人的间隔秒数 |
+| `PR_REVIEW_MAX_ROUNDS` | `3` | 最大审查轮次数 |
 
 ## 仓库结构
 
