@@ -1,7 +1,7 @@
 # claude-code-pr-review-respond
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.2-green.svg)](SKILL.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](SKILL.md)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-orange.svg)](https://claude.ai/code)
 
 > [English Version](README.md)
@@ -10,13 +10,14 @@
 
 ## 功能
 
-1. **获取** 所有 PR 审查评论（通过 GitHub REST + GraphQL API）
+1. **获取** 所有 PR 审查评论（通过 GitHub REST + GraphQL API，支持分页和重试）
 2. **分类** 每条评论为：已修复 / 需要修复 / 不采纳
 3. **实施** 代码修复，运行测试，提交，推送
 4. **回复** 每条审查评论（使用中文）
 5. **解决** 回复后立即解决每个讨论串
 6. **自动循环** — 推送修复后，等待 AI 审查机器人反馈并处理新评论（最多 3 轮）
 7. **建立双向追溯** — commit 消息引用评论 ID，回复引用 commit SHA
+8. **前置验证** — 自动检查 gh CLI、认证状态、PR 状态和分支安全性
 
 ## 为什么是技能而不是普通提示词
 
@@ -70,13 +71,14 @@ npx skills add https://github.com/kingside33/claude-code-pr-review-respond
 - [GitHub CLI](https://cli.github.com/) (`gh`) 已安装并认证 (`gh auth login`)
 - Git 仓库需关联 GitHub 远程仓库
 - 需要仓库的写入权限
+- PR 不能是已合并、已关闭或草稿状态
 - 项目需包含测试套件
 
 ## 工作流程
 
 ### 第一步 — 获取审查评论
 
-使用 `gh api` 获取所有 PR 审查评论（REST 接口）和讨论串解决状态（GraphQL 接口）。第 2+ 轮会过滤掉之前轮次已处理的评论串。
+使用 `gh api`（带重试逻辑）获取所有 PR 审查评论（REST 接口）和讨论串解决状态（GraphQL 接口，支持游标分页）。检查速率限制、验证输出、映射 REST 评论 ID 到 GraphQL 讨论串 ID。第 2+ 轮会过滤掉之前轮次已处理的评论串，并检测属于过时 diff 的评论。
 
 ### 第二步 — 分类
 
@@ -88,7 +90,7 @@ npx skills add https://github.com/kingside33/claude-code-pr-review-respond
 
 ### 第三步 — 实施修复
 
-进行最小化代码更改，自动检测并运行测试套件，按照 conventional commit 格式提交（包含 `Addresses review comments: #id` 行和 `Co-Authored-By` 署名），然后推送。
+进行最小化代码更改，自动检测并运行测试套件（17 种运行器优先级表：npm、pnpm、yarn、pytest、uv、poetry、tox、dotnet、mvn、gradle、cargo、go、bundler、mix、Makefile 等），检查变基安全性，首次推送前确认用户，按照 conventional commit 格式提交（包含 `Addresses review comments: #id` 行和 `Co-Authored-By` 署名），然后推送并提供推送失败诊断。
 
 ### 第四步 — 回复并解决
 
@@ -117,6 +119,8 @@ npx skills add https://github.com/kingside33/claude-code-pr-review-respond
 |------|--------|------|
 | `PR_REVIEW_POLL_INTERVAL` | `45` | 等待 AI 审查机器人的间隔秒数 |
 | `PR_REVIEW_MAX_ROUNDS` | `3` | 最大审查轮次数 |
+| `PR_REVIEW_SKIP_CONFIRM` | `false` | 设为 `true` 跳过用户确认提示，用于自动化环境 |
+| `PR_REVIEW_RETRY_COUNT` | `3` | `gh api` 临时失败的重试次数 |
 
 ## 仓库结构
 

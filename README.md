@@ -1,7 +1,7 @@
 # claude-code-pr-review-respond
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.2-green.svg)](SKILL.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](SKILL.md)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-orange.svg)](https://claude.ai/code)
 
 > [中文版本](README.zh-CN.md)
@@ -10,13 +10,14 @@ A [Claude Code](https://claude.ai/code) skill that automates responding to code 
 
 ## What it does
 
-1. **Fetches** all PR review comments via GitHub API (GraphQL + REST)
+1. **Fetches** all PR review comments via GitHub API (GraphQL + REST) with pagination and retry logic
 2. **Categorizes** each comment into: _already fixed_ / _needs fix_ / _wontfix_
 3. **Implements** code fixes for "needs fix" items, runs tests, commits, pushes
 4. **Replies** to each review thread in Chinese (中文) on GitHub
 5. **Resolves** each conversation thread after replying
 6. **Loops** automatically — after pushing fixes, waits for AI review bot feedback and processes new comments (up to 3 rounds)
 7. **Creates bidirectional trace** between commits and comments: commit messages reference comment IDs, replies reference commit SHAs
+8. **Pre-flight validation** — checks gh CLI, auth, PR state, and branch safety before starting
 
 ## Why a skill, not just a prompt
 
@@ -70,13 +71,14 @@ If no arguments are given, the skill auto-detects from `git remote get-url origi
 - [GitHub CLI](https://cli.github.com/) (`gh`) installed and authenticated (`gh auth login`)
 - Git repository with a GitHub remote
 - Write access to the repository
+- PR must not be merged, closed, or in draft state
 - Project must have a test suite
 
 ## How it works
 
 ### Step 1 — Fetch review comments
 
-Uses `gh api` to retrieve all PR review comments (REST) and thread resolution status (GraphQL). In round 2+, filters out threads already processed in prior rounds.
+Uses `gh api` with retry logic to retrieve all PR review comments (REST) and thread resolution status (GraphQL with cursor-based pagination). Checks rate limits, validates output, and maps REST comment IDs to GraphQL thread IDs. In round 2+, filters out threads already processed in prior rounds. Detects comments on outdated diffs by comparing commit IDs.
 
 ### Step 2 — Categorize
 
@@ -88,7 +90,7 @@ Uses `gh api` to retrieve all PR review comments (REST) and thread resolution st
 
 ### Step 3 — Implement fixes
 
-Makes minimal code changes, auto-detects and runs the test suite, commits with conventional commit format including `Addresses review comments: #id` line and `Co-Authored-By` trailer, then pushes.
+Makes minimal code changes, auto-detects and runs the test suite (17-runner priority table: npm, pnpm, yarn, pytest, uv, poetry, tox, dotnet, mvn, gradle, cargo, go, bundler, mix, Makefile, and more), checks rebase safety, confirms with user before first push, commits with conventional commit format including `Addresses review comments: #id` line and `Co-Authored-By` trailer, then pushes with failure diagnosis.
 
 ### Step 4 — Reply and resolve
 
@@ -117,6 +119,8 @@ All replies are in Chinese:
 |----------|---------|-------------|
 | `PR_REVIEW_POLL_INTERVAL` | `45` | Seconds to wait for AI review bot between rounds |
 | `PR_REVIEW_MAX_ROUNDS` | `3` | Maximum number of review rounds |
+| `PR_REVIEW_SKIP_CONFIRM` | `false` | Skip user confirmation prompts for automated environments |
+| `PR_REVIEW_RETRY_COUNT` | `3` | Number of retry attempts for transient `gh api` failures |
 
 ## Repository structure
 

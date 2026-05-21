@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.1.0] — 2026-05-21
+
+### Added
+
+- Pre-flight validation: verify gh CLI, authentication, PR state (not merged/closed/draft), and branch safety before starting work
+- Comprehensive test runner auto-detection: expanded from 6 to 17 rules covering npm, pnpm, yarn, pytest, tox, uv, poetry, dotnet, mvn, gradle, cargo, go, bundler, mix, and Makefile
+- GraphQL pagination for reviewThreads: cursor-based loop replaces the `first:100` static query with no limit on thread count
+- Rate limit awareness: check remaining API calls after each `gh api` request and warn when low
+- Transient failure retry: automatic retry (configurable via `PR_REVIEW_RETRY_COUNT`) for `gh api` network errors with exponential backoff
+- Push failure diagnosis: detect non-fast-forward, branch protection, and missing-upstream errors with actionable advice
+- Rebase safety check: detect if PR branch has fallen behind its base before pushing
+- User confirmation prompt before first push in round 1 (skippable via `PR_REVIEW_SKIP_CONFIRM=true`)
+- Outdated diff detection: flag comments on old `commit_id` values and verify the issue still applies to current code
+- Thread-to-comment ID mapping documentation: clarify relationship between REST numeric `id` and GraphQL thread `id`
+
+### Changed
+
+- GraphQL mutation queries now use heredoc + temp file + placeholder replacement pattern instead of inline `-f query=` to prevent shell escaping issues with special characters in Chinese reply text
+- Pre-Step renamed to "Validate environment and initialize session state" reflecting new validation logic
+
+### Fixed
+
+- Thread-to-comment ID mapping now explicitly documented, resolving ambiguity between REST numeric `id` and GraphQL thread `id`
+
 ## [1.0.2] — 2026-05-21
 
 ### Fixed
