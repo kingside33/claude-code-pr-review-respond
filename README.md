@@ -1,7 +1,7 @@
 # claude-code-pr-review-respond
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.1-green.svg)](SKILL.md)
+[![Version](https://img.shields.io/badge/version-1.0.2-green.svg)](SKILL.md)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-orange.svg)](https://claude.ai/code)
 
 > [中文版本](README.zh-CN.md)

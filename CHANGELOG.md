@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.2] — 2026-05-21
+
+### Fixed
+
+- Step 2 premature exit: wontfix comments are now replied to and resolved before exiting the loop, instead of being silently skipped
+- Step numbering gap: "Post-Loop — Summary report" renumbered as "Step 5 — Summary report" for consistency
+
+### Added
+
+- GraphQL `reviewThreads(first:100)` pagination note documenting the limit and cursor-based pagination for PRs with >100 threads
+- Error handling guidance: if `resolveReviewThread` fails (thread already resolved externally), continue to next thread gracefully
+
 ## [1.0.1] — 2026-05-21
 
 ### Added

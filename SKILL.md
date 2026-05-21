@@ -2,7 +2,7 @@
 name: pr-review-respond
 description: "Respond to all code review comments on a pull request, implement fixes, run tests, commit, reply on GitHub (in Chinese), and resolve conversations. Supports multi-round review loops with AI review bots. Use when the user says \"处理审查意见\", \"回复 review\", \"resolve PR comments\", \"修复审查意见\", \"处理PR评论\", \"review feedback\", \"address comments\", \"reply to review\", or similar phrases."
 trigger: /pr-review-respond
-version: 1.0.1
+version: 1.0.2
 license: MIT
 allowed-tools: Bash(gh *), Bash(git *), Read, Write, Edit, Grep, Glob
 ---
@@ -76,6 +76,10 @@ query($owner:String!,$repo:String!,$pr:Int!) {
 }' -F owner=<owner> -F repo=<repo> -F pr=<PR>
 ```
 
+> **Note**: The GraphQL query paginates `first:100` threads. For PRs with more
+> than 100 review threads, add pagination logic using the `after` cursor and
+> `pageInfo.hasNextPage` fields. In practice, PRs rarely exceed 100 threads.
+
 If this is round 2 or later, filter the fetched threads:
 
 1. Remove any thread whose `id` is already in `processed_thread_ids`
@@ -96,7 +100,7 @@ For each top-level comment (not a reply):
 
 For round 2+, when checking "already fixed": read the relevant file at the relevant lines. If the code already reflects the fix (i.e., the fix was applied in a prior round's commit), classify as "already fixed" and reference the prior round's commit SHA.
 
-If after categorization there are zero "needs fix" and zero "already fixed" comments, exit the loop (nothing actionable this round).
+If after categorization there are zero "needs fix" and zero "already fixed" comments, skip Step 3 (no code changes needed) and proceed to Step 4 to reply to and resolve wontfix threads.
 
 ### Step 3 — Implement fixes
 
@@ -168,6 +172,8 @@ mutation {
 
 Process one thread at a time: reply → resolve → next thread. Do NOT batch resolve all threads at the end.
 
+If `resolveReviewThread` returns an error (e.g., the thread was already resolved externally), note it and continue to the next thread — no action needed.
+
 ### After processing this round's threads
 
 1. For every thread replied to in this round, add its `thread.id` to `processed_thread_ids`
@@ -191,7 +197,7 @@ After completing the loop body (Steps 1–4), decide whether to continue to the 
    e. If none found: "未发现新的审查评论，退出循环。"
    f. If found: "发现 {N} 条新的审查评论，进入第 {round+1} 轮处理。" Increment `round` and go to Step 1.
 
-### Post-Loop — Summary report
+### Step 5 — Summary report
 
 After the loop exits, compile and display a summary:
 
